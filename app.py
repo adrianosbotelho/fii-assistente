@@ -1,154 +1,75 @@
 import streamlit as st
-import yaml
-import pandas as pd
+import altair as alt
 
-from services.loader import carregar_carteira
-from services.analytics import calcular_renda
+from core.data import carregar_carteira
+from core.projections import projetar_renda
+from core.benchmarks import simular_benchmark
 
 st.set_page_config(page_title="FII Assistente", layout="wide")
 
-st.title("📊 FII Assistente — Diagnóstico da Carteira")
+st.title("📊 FII Assistente — Visão Inteligente")
 
-# =====================
-# Carregamento de dados
-# =====================
 carteira = carregar_carteira()
 
-with open("config/regras.yaml") as f:
-    regras = yaml.safe_load(f)["meta_percentual"]
+patrimonio = carteira["valor"].sum()
+dy_medio = (carteira["valor"] * carteira["dy"]).sum() / patrimonio
+renda_atual = patrimonio * dy_medio / 12
 
-# =====================
-# Cálculo de valores
-# =====================
-# Preços atuais
-import yfinance as yf
+aba1, aba2, aba3, aba4 = st.tabs([
+    "📌 Visão Geral",
+    "📈 Projeções",
+    "⚖️ Comparativos",
+    "🧠 Insight IA"
+])
 
-dados = []
+# --- VISÃO GERAL ---
+with aba1:
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Patrimônio", f"R$ {patrimonio:,.2f}")
+    col2.metric("Renda Mensal Atual", f"R$ {renda_atual:,.2f}")
+    col3.metric("DY Médio", f"{dy_medio*100:.2f}%")
 
-valor_total = 0
-for _, row in carteira.iterrows():
-    ticker = row["ticker"]
-    qtd = row["quantidade"]
+    st.subheader("Composição da Carteira")
+    st.dataframe(carteira, use_container_width=True)
 
-    ativo = yf.Ticker(ticker + ".SA")
-    preco = ativo.history(period="1d")["Close"].iloc[-1]
+# --- PROJEÇÕES ---
+with aba2:
+    meses = st.slider("Horizonte (meses)", 12, 120, 60)
 
-    valor = preco * qtd
-    valor_total += valor
+    sem = projetar_renda(carteira, meses, reinvestir=False)
+    com = projetar_renda(carteira, meses, reinvestir=True)
 
-    dados.append({
-        "Ativo": ticker,
-        "Quantidade": qtd,
-        "Preço": round(preco, 2),
-        "Valor": valor
+    base = alt.Chart(sem).encode(x="Mês")
+
+    linha_sem = base.mark_line(color="red").encode(y="Renda Mensal")
+    linha_com = alt.Chart(com).mark_line(color="green").encode(x="Mês", y="Renda Mensal")
+
+    st.altair_chart(linha_sem + linha_com, use_container_width=True)
+
+# --- COMPARATIVOS ---
+with aba3:
+    cdi = simular_benchmark(patrimonio, 0.10, meses)
+    ibov = simular_benchmark(patrimonio, 0.08, meses)
+
+    st.subheader("Carteira vs CDI vs IBOV (simples)")
+
+    st.line_chart({
+        "Carteira (reinv.)": com["Patrimônio"].values,
+        "CDI": [x["Valor"] for x in cdi],
+        "IBOV": [x["Valor"] for x in ibov]
     })
 
-df = pd.DataFrame(dados)
+# --- INSIGHT IA ---
+with aba4:
+    st.subheader("Insight do Mês")
 
-# =====================
-# Diagnóstico
-# =====================
-diagnostico = []
-
-for _, row in df.iterrows():
-    ativo = row["Ativo"]
-    valor = row["Valor"]
-
-    pct_real = (valor / valor_total) * 100
-    pct_ideal = regras.get(ativo, 0)
-    desvio = pct_real - pct_ideal
-
-    if abs(desvio) <= 2:
-        status = "🟢 OK"
-    elif desvio > 2 and desvio <= 4:
-        status = "🟡 Atenção"
-    elif desvio > 4:
-        status = "🔴 Desbalanceado"
-    else:
-        status = "🔵 Oportunidade"
-
-    diagnostico.append({
-        "Ativo": ativo,
-        "% Carteira": round(pct_real, 2),
-        "% Ideal": pct_ideal,
-        "Desvio": round(desvio, 2),
-        "Status": status
-    })
-
-df_diag = pd.DataFrame(diagnostico)
-
-# =====================
-# Visão Executiva
-# =====================
-renda = calcular_renda(carteira)
-
-col1, col2, col3 = st.columns(3)
-
-col1.metric("💰 Renda mensal estimada", f"R$ {renda}")
-col2.metric("📦 Ativos fora do peso", len(df_diag[df_diag["Status"] != "🟢 OK"]))
-col3.metric("🎯 Total da carteira", f"R$ {round(valor_total, 2)}")
-
-st.divider()
-
-# =====================
-# Tabela de Diagnóstico
-# =====================
-st.subheader("🔍 Diagnóstico de Alocação")
-
-st.dataframe(
-    df_diag.sort_values("Desvio", ascending=False),
-    use_container_width=True
-)
-
-# =====================
-# Resumo em linguagem humana
-# =====================
-st.subheader("🧠 Leitura Gerencial")
-
-problemas = df_diag[df_diag["Status"] == "🔴 Desbalanceado"]
-oportunidades = df_diag[df_diag["Status"] == "🔵 Oportunidade"]
-
-if problemas.empty and oportunidades.empty:
-    st.success("Carteira bem equilibrada. Nenhuma ação necessária no momento.")
-else:
-    if not problemas.empty:
-        st.warning(
-            f"Ativos acima do peso: {', '.join(problemas['Ativo'].tolist())}"
-        )
-    if not oportunidades.empty:
+    if renda_atual < 1000:
         st.info(
-            f"Oportunidade de reforço: {', '.join(oportunidades['Ativo'].tolist())}"
+            "A renda ainda depende fortemente do reinvestimento. "
+            "Manter consistência agora tem impacto exponencial no médio prazo."
         )
-
-
-st.divider()
-st.subheader("🔁 Reinvestimento Inteligente (Próximo Aporte)")
-
-# Selecionar oportunidades reais
-candidatos = df_diag[df_diag["Status"] == "🔵 Oportunidade"].copy()
-
-if candidatos.empty:
-    st.info("Nenhum ativo abaixo do peso no momento. Reinvestimento não recomendado.")
-else:
-    # Limitar aos top 3 maiores desvios negativos
-    candidatos = candidatos.sort_values("Desvio").head(3)
-
-    total_abs = candidatos["Desvio"].abs().sum()
-
-    sugestao = []
-    for _, row in candidatos.iterrows():
-        percentual = abs(row["Desvio"]) / total_abs * 100
-        sugestao.append({
-            "Ativo": row["Ativo"],
-            "Motivo": "Abaixo do peso ideal",
-            "% do Aporte": round(percentual, 1)
-        })
-
-    st.table(sugestao)
-
-    ativos = ", ".join([s["Ativo"] for s in sugestao])
-    st.success(
-        f"Priorize o próximo reinvestimento em: {ativos}. "
-        "Essa alocação melhora o equilíbrio da carteira sem aumentar risco."
-    )
-        
+    else:
+        st.success(
+            "A carteira já apresenta autonomia de renda. "
+            "Rebalanceamentos passam a ser mais importantes que crescimento."
+        )
