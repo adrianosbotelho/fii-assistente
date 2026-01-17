@@ -119,3 +119,36 @@ else:
         st.info(
             f"Oportunidade de reforço: {', '.join(oportunidades['Ativo'].tolist())}"
         )
+
+
+st.divider()
+st.subheader("🔁 Reinvestimento Inteligente (Próximo Aporte)")
+
+# Selecionar oportunidades reais
+candidatos = df_diag[df_diag["Status"] == "🔵 Oportunidade"].copy()
+
+if candidatos.empty:
+    st.info("Nenhum ativo abaixo do peso no momento. Reinvestimento não recomendado.")
+else:
+    # Limitar aos top 3 maiores desvios negativos
+    candidatos = candidatos.sort_values("Desvio").head(3)
+
+    total_abs = candidatos["Desvio"].abs().sum()
+
+    sugestao = []
+    for _, row in candidatos.iterrows():
+        percentual = abs(row["Desvio"]) / total_abs * 100
+        sugestao.append({
+            "Ativo": row["Ativo"],
+            "Motivo": "Abaixo do peso ideal",
+            "% do Aporte": round(percentual, 1)
+        })
+
+    st.table(sugestao)
+
+    ativos = ", ".join([s["Ativo"] for s in sugestao])
+    st.success(
+        f"Priorize o próximo reinvestimento em: {ativos}. "
+        "Essa alocação melhora o equilíbrio da carteira sem aumentar risco."
+    )
+        
