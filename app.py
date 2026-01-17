@@ -1,145 +1,99 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import datetime
 
-# =============================
-# CONFIGURAÇÃO GERAL
-# =============================
+# ===============================
+# CONFIGURAÇÃO DA PÁGINA
+# ===============================
 st.set_page_config(
     page_title="FII Assistente",
-    page_icon="📊",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# =============================
-# FUNÇÕES AUXILIARES
-# =============================
-def carregar_csv(uploaded_file):
-    df = pd.read_csv(uploaded_file)
-    df.columns = [c.lower().strip() for c in df.columns]
+st.title("📊 FII Assistente – Visão Geral da Carteira")
 
-    colunas_obrigatorias = {"ticker", "quantidade", "preco_medio"}
-    if not colunas_obrigatorias.issubset(set(df.columns)):
-        raise ValueError(
-            "O CSV precisa conter as colunas: ticker, quantidade, preco_medio"
-        )
+# ===============================
+# SIDEBAR – IMPORTAÇÃO CSV
+# ===============================
+st.sidebar.header("📁 Importar Carteira")
 
-    df["quantidade"] = pd.to_numeric(df["quantidade"], errors="coerce")
-    df["preco_medio"] = pd.to_numeric(df["preco_medio"], errors="coerce")
-    df["valor_investido"] = df["quantidade"] * df["preco_medio"]
-
-    return df
-
-def grafico_alocacao(df):
-    fig = go.Figure(
-        data=[
-            go.Pie(
-                labels=df["ticker"],
-                values=df["valor_investido"],
-                hole=0.5
-            )
-        ]
-    )
-
-    fig.update_layout(
-        title="Distribuição da Carteira (R$)",
-        legend_title="FIIs",
-        template="plotly_dark"
-    )
-
-    return fig
-
-# =============================
-# SIDEBAR
-# =============================
-st.sidebar.markdown(
-    "### 📊 FII Assistente\n"
-    "Plataforma de acompanhamento\n"
-    "e projeção de FIIs\n\n"
-    "---\n"
-    "**Etapa atual:**\n"
-    "- Importação da carteira (CSV)\n"
-)
-
-# =============================
-# CONTEÚDO PRINCIPAL
-# =============================
-st.title("📂 Importar Carteira de FIIs")
-
-st.markdown(
-    """
-    Faça upload de um arquivo **CSV** com a sua carteira.
-
-    **Formato esperado:**
-    ```csv
-    ticker,quantidade,preco_medio
-    KNCR11,120,103.20
-    CPTS11,200,94.50
-    BTLG11,80,98.70
-    ```
-    """
-)
-
-uploaded_file = st.file_uploader(
-    "Selecione o arquivo CSV da sua carteira",
+uploaded_file = st.sidebar.file_uploader(
+    "Importe o CSV da sua carteira",
     type=["csv"]
 )
 
-if uploaded_file is not None:
-    try:
-        carteira_df = carregar_csv(uploaded_file)
+if uploaded_file is None:
+    st.info("👉 Importe um arquivo CSV para visualizar sua carteira.")
+    st.stop()
 
-        st.success("Carteira importada com sucesso ✅")
+# ===============================
+# LEITURA DO CSV
+# ===============================
+df = pd.read_csv(uploaded_file)
 
-        # =============================
-        # MÉTRICAS
-        # =============================
-        total_investido = carteira_df["valor_investido"].sum()
-        qtd_fiis = carteira_df.shape[0]
+# Esperado no CSV:
+# Ticker | Quantidade | Preco_Medio | Dividendo_Mensal
 
-        col1, col2 = st.columns(2)
-        col1.metric("💰 Total Investido", f"R$ {total_investido:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        col2.metric("🏢 Quantidade de FIIs", qtd_fiis)
+df.columns = [c.strip() for c in df.columns]
 
-        st.markdown("---")
+# ===============================
+# CÁLCULOS DA CARTEIRA
+# ===============================
+df["Valor_Investido"] = df["Quantidade"] * df["Preco_Medio"]
+df["Renda_Mensal"] = df["Quantidade"] * df["Dividendo_Mensal"]
 
-        # =============================
-        # TABELA
-        # =============================
-        st.subheader("📋 Carteira Importada")
-        st.dataframe(
-            carteira_df.style.format(
-                {
-                    "preco_medio": "R$ {:.2f}",
-                    "valor_investido": "R$ {:.2f}"
-                }
-            ),
-            width="stretch"
-        )
+patrimonio_total = df["Valor_Investido"].sum()
+renda_mensal_total = df["Renda_Mensal"].sum()
+renda_anual = renda_mensal_total * 12
 
-        st.markdown("---")
+yield_mensal = (
+    (renda_mensal_total / patrimonio_total) * 100
+    if patrimonio_total > 0 else 0
+)
 
-        # =============================
-        # GRÁFICO
-        # =============================
-        st.subheader("📊 Alocação da Carteira")
-        fig = grafico_alocacao(carteira_df)
-        st.plotly_chart(fig, width="stretch")
+# ===============================
+# KPIs – CARDS SUPERIORES
+# ===============================
+col1, col2, col3, col4 = st.columns(4)
 
-        st.markdown("---")
+col1.metric(
+    "💰 Patrimônio Total",
+    f"R$ {patrimonio_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
 
-        # =============================
-        # PRÓXIMO PASSO
-        # =============================
-        st.info(
-            "✅ Carteira carregada.\n\n"
-            "Próximo passo: **persistir esses dados** e iniciar\n"
-            "projeções reais de dividendos."
-        )
+col2.metric(
+    "📥 Renda Mensal",
+    f"R$ {renda_mensal_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
 
-    except Exception as e:
-        st.error(f"Erro ao processar o CSV: {e}")
+col3.metric(
+    "📈 Yield Mensal",
+    f"{yield_mensal:.2f}%"
+)
 
-else:
-    st.warning("Aguardando upload do arquivo CSV.")
+col4.metric(
+    "📅 Renda Anual Projetada",
+    f"R$ {renda_anual:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
+
+st.divider()
+
+# ===============================
+# TABELA DA CARTEIRA
+# ===============================
+st.subheader("📋 Detalhamento da Carteira")
+
+df_display = df.copy()
+df_display["Valor_Investido"] = df_display["Valor_Investido"].map(
+    lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
+df_display["Renda_Mensal"] = df_display["Renda_Mensal"].map(
+    lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
+
+st.dataframe(
+    df_display,
+    use_container_width=True,
+    hide_index=True
+)
