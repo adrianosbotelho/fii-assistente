@@ -3,118 +3,126 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 
-# -------------------------------------------------
+# =========================
 # CONFIGURAÇÃO DA PÁGINA
-# -------------------------------------------------
+# =========================
 st.set_page_config(
     page_title="FII Assistente",
     page_icon="📊",
     layout="wide"
 )
 
-# -------------------------------------------------
+# =========================
 # SIDEBAR
-# -------------------------------------------------
+# =========================
+st.sidebar.title("📊 FII Assistente")
+
 st.sidebar.markdown(
     """
-    ## 📊 FII Assistente
+    **Plataforma profissional de FIIs**
 
-    Plataforma profissional para análise de FIIs.
-
-    **Funcionalidades:**
-    - Diagnóstico de carteira
-    - Projeção de renda
-    - Dashboard visual
-    - Reinvestimento inteligente
-
-    ---
-    **Origem da carteira**
+    Funcionalidades:
+    - 📈 Dashboard da carteira
+    - 💰 Projeção de renda
+    - 📊 Gráficos interativos
+    - 📁 Importação de dados (em breve)
     """
 )
 
-origem = st.sidebar.radio(
-    "Como deseja importar sua carteira?",
-    [
-        "Manual",
-        "CSV",
-        "Integração B3",
-        "Investidor10"
-    ]
+menu = st.sidebar.radio(
+    "Menu",
+    ["Dashboard", "Projeção de Renda"]
 )
 
-st.sidebar.markdown("---")
-st.sidebar.caption("© 2026 • FII Assistente")
-
-# -------------------------------------------------
-# DADOS (EXEMPLO)
-# -------------------------------------------------
+# =========================
+# DADOS MOCK (TEMPORÁRIOS)
+# =========================
 dados = {
-    "FII": ["BTLG11", "KNCR11", "VISC11", "MXRF11"],
-    "Valor Investido": [10462, 8765, 9795, 7096],
-    "Renda Mensal": [80, 100, 75, 85]
+    "FII": ["BTLG11", "VISC11", "KNCR11", "MXRF11"],
+    "Quantidade": [100, 80, 120, 200],
+    "Preço Atual": [102.50, 108.90, 105.20, 9.80],
+    "DY (%)": [9.1, 8.8, 13.5, 12.4]
 }
 
 df = pd.DataFrame(dados)
+df["Valor Investido"] = df["Quantidade"] * df["Preço Atual"]
 
-total_investido = df["Valor Investido"].sum()
-renda_mensal = df["Renda Mensal"].sum()
-renda_anual = renda_mensal * 12
+# =========================
+# DASHBOARD
+# =========================
+if menu == "Dashboard":
+    st.title("📈 Dashboard da Carteira")
 
-# -------------------------------------------------
-# HEADER
-# -------------------------------------------------
-st.title("📊 Dashboard da Carteira de FIIs")
-st.caption(f"Última atualização: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    col1, col2, col3 = st.columns(3)
 
-# -------------------------------------------------
-# KPIs
-# -------------------------------------------------
-col1, col2, col3 = st.columns(3)
-
-col1.metric("💰 Total Investido", f"R$ {total_investido:,.2f}")
-col2.metric("📥 Renda Mensal", f"R$ {renda_mensal:,.2f}")
-col3.metric("📈 Renda Anual", f"R$ {renda_anual:,.2f}")
-
-st.markdown("---")
-
-# -------------------------------------------------
-# GRÁFICO 1 - DISTRIBUIÇÃO DA CARTEIRA
-# -------------------------------------------------
-fig_pie = go.Figure(
-    data=[
-        go.Pie(
-            labels=df["FII"],
-            values=df["Valor Investido"],
-            hole=0.45
+    with col1:
+        st.metric(
+            "💼 Patrimônio Total",
+            f"R$ {df['Valor Investido'].sum():,.2f}"
         )
-    ]
-)
 
-fig_pie.update_layout(
-    title="Distribuição da Carteira por FII",
-    margin=dict(t=60, b=20, l=20, r=20)
-)
+    with col2:
+        st.metric(
+            "📊 FIIs na Carteira",
+            df.shape[0]
+        )
 
-st.plotly_chart(fig_pie, width="stretch")
+    with col3:
+        renda_mensal = (df["Valor Investido"] * df["DY (%)"] / 100 / 12).sum()
+        st.metric(
+            "💰 Renda Mensal Estimada",
+            f"R$ {renda_mensal:,.2f}"
+        )
 
-# -------------------------------------------------
-# GRÁFICO 2 - PROJEÇÃO DE RENDA
-# -------------------------------------------------
-meses = pd.date_range(start="2026-01-01", periods=12, freq="ME")
-renda_proj = [renda_mensal] * 12
+    st.subheader("📋 Detalhes da Carteira")
+    st.dataframe(df, use_container_width=True)
 
-fig_renda = go.Figure()
-
-fig_renda.add_trace(
-    go.Scatter(
-        x=meses,
-        y=renda_proj,
-        mode="lines+markers",
-        name="Renda Mensal Projetada"
+    # Gráfico de alocação
+    fig_alocacao = go.Figure(
+        data=[
+            go.Pie(
+                labels=df["FII"],
+                values=df["Valor Investido"],
+                hole=0.4
+            )
+        ]
     )
-)
 
-fig_renda.update_layout(
-    title="Projeção de Renda Mensal (12 meses)",
-    xaxis_title="Mês",
-    yaxis_title="R$",_
+    fig_alocacao.update_layout(
+        title="Distribuição da Carteira por FII"
+    )
+
+    st.plotly_chart(fig_alocacao, use_container_width=True)
+
+# =========================
+# PROJEÇÃO DE RENDA
+# =========================
+if menu == "Projeção de Renda":
+    st.title("💰 Projeção de Renda")
+
+    anos = st.slider(
+        "Horizonte de projeção (anos)",
+        min_value=1,
+        max_value=10,
+        value=5
+    )
+
+    crescimento_anual = st.slider(
+        "Crescimento anual da renda (%)",
+        min_value=0.0,
+        max_value=15.0,
+        value=5.0
+    )
+
+    renda_atual_mensal = (df["Valor Investido"] * df["DY (%)"] / 100 / 12).sum()
+
+    datas = pd.date_range(
+        start=datetime.today(),
+        periods=anos * 12,
+        freq="ME"
+    )
+
+    rendas = []
+    renda = renda_atual_mensal
+
+    for _ in range(_
