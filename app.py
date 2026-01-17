@@ -1,71 +1,95 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="FII Assistente", layout="wide")
-
-st.title("📊 FII Assistente — Dashboard Profissional")
-
-# =========================
-# Dados simulados
-# =========================
-datas = pd.date_range(start="2024-01-01", periods=24, freq="ME")
-proventos = np.cumsum(np.random.uniform(500, 900, size=len(datas)))
-patrimonio = 70000 + np.cumsum(np.random.uniform(-500, 1200, size=len(datas)))
-
-df = pd.DataFrame({
-    "Data": datas,
-    "Proventos Acumulados": proventos,
-    "Patrimônio": patrimonio
-})
-
-# =========================
-# Gráfico de Proventos
-# =========================
-fig_prov = go.Figure()
-fig_prov.add_trace(go.Scatter(
-    x=df["Data"],
-    y=df["Proventos Acumulados"],
-    mode="lines+markers",
-    name="Proventos"
-))
-
-fig_prov.update_layout(
-    title="Evolução dos Proventos",
-    xaxis_title="Data",
-    yaxis_title="R$",
-    template="plotly_white"
+# ================= CONFIG =================
+st.set_page_config(
+    page_title="FII Assistente",
+    layout="wide",
+    page_icon="📊"
 )
 
-# =========================
-# Gráfico de Patrimônio
-# =========================
-fig_patr = go.Figure()
-fig_patr.add_trace(go.Scatter(
-    x=df["Data"],
-    y=df["Patrimônio"],
-    mode="lines+markers",
-    name="Patrimônio"
-))
+st.title("📊 FII Assistente — Dashboard de Renda Real")
 
-fig_patr.update_layout(
-    title="Evolução do Patrimônio",
-    xaxis_title="Data",
-    yaxis_title="R$",
-    template="plotly_white"
-)
+# ================= FUNÇÕES =================
+def brl(valor):
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-# =========================
-# Layout
-# =========================
-col1, col2 = st.columns(2)
+# ================= DADOS DA CARTEIRA =================
+df = pd.read_csv("carteira.csv")
 
-with col1:
-    st.plotly_chart(fig_prov, width="stretch")
+df["renda_mensal"] = df["quantidade"] * df["provento_mensal"]
+renda_total = df["renda_mensal"].sum()
 
-with col2:
-    st.plotly_chart(fig_patr, width="stretch")
+# ================= KPIs =================
+col1, col2, col3 = st.columns(3)
+
+col1.metric("💰 Renda Mensal Atual", brl(renda_total))
+col2.metric("📆 Renda Anual", brl(renda_total * 12))
+col3.metric("📦 Nº de FIIs", len(df))
 
 st.markdown("---")
-st.success("Aplicação estável e pronta para evolução 🚀")
+
+# ================= TABELA DETALHADA =================
+st.subheader("📋 Detalhamento da Carteira")
+
+df_show = df.copy()
+df_show["renda_mensal"] = df_show["renda_mensal"].apply(brl)
+df_show["provento_mensal"] = df_show["provento_mensal"].apply(brl)
+
+st.dataframe(df_show, use_container_width=True)
+
+# ================= GRÁFICO RENDA POR FII =================
+fig = go.Figure()
+
+fig.add_trace(
+    go.Bar(
+        x=df["ticker"],
+        y=df["renda_mensal"],
+        marker_color="#00E5FF",
+        text=[brl(v) for v in df["renda_mensal"]],
+        textposition="auto"
+    )
+)
+
+fig.update_layout(
+    title="📊 Renda Mensal por FII",
+    template="plotly_dark",
+    yaxis=dict(tickprefix="R$ ", separatethousands=True),
+    height=420
+)
+
+st.plotly_chart(fig, width="stretch")
+
+# ================= PROJEÇÃO =================
+st.markdown("---")
+st.subheader("🔮 Projeção com Reinvestimento (Conservador)")
+
+meses = st.slider("Horizonte (meses)", 6, 120, 36)
+
+renda = renda_total
+projecao = []
+
+for _ in range(meses):
+    projecao.append(renda)
+    renda += renda * 0.01  # crescimento conservador (1% ao mês)
+
+fig_proj = go.Figure()
+
+fig_proj.add_trace(
+    go.Scatter(
+        y=projecao,
+        mode="lines+markers",
+        line=dict(color="#00C853", width=3),
+        name="Renda Projetada"
+    )
+)
+
+fig_proj.update_layout(
+    title="📈 Projeção de Renda Mensal",
+    template="plotly_dark",
+    yaxis=dict(tickprefix="R$ ", separatethousands=True),
+    height=420
+)
+
+st.plotly_chart(fig_proj, width="stretch")
