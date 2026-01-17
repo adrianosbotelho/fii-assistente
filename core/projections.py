@@ -1,4 +1,7 @@
+import streamlit as st
 import pandas as pd
+from charts import grafico_projecao
+
 
 def projetar_renda(carteira, meses=60, reinvestir=True):
     patrimonio = carteira["valor"].sum()
