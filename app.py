@@ -15,6 +15,7 @@ from core.market_data import obter_indices, calcular_correlacao_carteira_mercado
 from core.carteira_health import analisar_saude_carteira, gerar_recomendacoes
 from core.news_analyzer import analisar_sentimento_carteira, buscar_noticias_mercado
 from core.benchmarks import simular_benchmark
+from core.carteira_loader import carregar_carteira_completa, carregar_carteira_csv
 
 # -------------------------------------------------
 # CONFIGURAÇÃO
@@ -91,6 +92,13 @@ horizonte = st.sidebar.slider(
     value=60
 )
 
+# Opção para atualização automática de dados
+atualizar_dados_auto = st.sidebar.checkbox(
+    "🔄 Atualizar preços e dividendos automaticamente",
+    value=False,
+    help="Busca preços atuais e dividendos do mercado via API"
+)
+
 atualizar_mercado = st.sidebar.button("🔄 Atualizar Dados de Mercado", type="primary")
 
 # -------------------------------------------------
@@ -98,15 +106,42 @@ atualizar_mercado = st.sidebar.button("🔄 Atualizar Dados de Mercado", type="p
 # -------------------------------------------------
 try:
     if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
+        # Se foi feito upload, usar arquivo temporário
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
+            tmp.write(uploaded_file.getvalue())
+            tmp_path = tmp.name
+        
+        if atualizar_dados_auto:
+            df = carregar_carteira_completa(tmp_path, atualizar_dados=True, usar_preco_medio=False)
+        else:
+            df_temp = pd.read_csv(tmp_path)
+            # Se CSV tem apenas Ticker e Quantidade, tentar usar loader automático
+            if set(df_temp.columns) <= {"Ticker", "Quantidade"}:
+                st.info("💡 CSV simplificado detectado. Ativando atualização automática de dados...")
+                df = carregar_carteira_completa(tmp_path, atualizar_dados=True, usar_preco_medio=False)
+            else:
+                df = df_temp
     else:
-        df = pd.read_csv(carteira_path)
+        # Usar arquivo padrão
+        if atualizar_dados_auto:
+            df = carregar_carteira_completa(carteira_path, atualizar_dados=True, usar_preco_medio=False)
+        else:
+            df_temp = pd.read_csv(carteira_path)
+            # Se CSV tem apenas Ticker e Quantidade, tentar usar loader automático
+            if set(df_temp.columns) <= {"Ticker", "Quantidade"}:
+                st.info("💡 CSV simplificado detectado. Ativando atualização automática de dados...")
+                df = carregar_carteira_completa(carteira_path, atualizar_dados=True, usar_preco_medio=False)
+            else:
+                df = df_temp
 except FileNotFoundError:
     st.error(f"❌ Arquivo não encontrado: {carteira_path}")
     st.info("⬅️ Por favor, importe um arquivo CSV na sidebar ou coloque data/carteira.csv")
     st.stop()
 except Exception as e:
     st.error(f"❌ Erro ao carregar arquivo: {e}")
+    if atualizar_dados_auto:
+        st.info("💡 Dica: Tente desativar 'Atualizar automaticamente' se houver problema de conexão")
     st.stop()
 
 # -------------------------------------------------
