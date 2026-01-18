@@ -16,6 +16,11 @@ from core.carteira_health import analisar_saude_carteira, gerar_recomendacoes
 from core.news_analyzer import analisar_sentimento_carteira, buscar_noticias_mercado
 from core.benchmarks import simular_benchmark
 from core.carteira_loader import carregar_carteira_completa, carregar_carteira_csv
+from core.reinvestment_manager import (
+    calcular_reinvestimento, gerar_carteira_atualizada, 
+    salvar_carteira_atualizada, gerar_relatorio_reinvestimento,
+    calcular_distribuicao_reinvestimento
+)
 
 # -------------------------------------------------
 # CONFIGURAÇÃO
@@ -652,7 +657,13 @@ df_view["Prioridade_Reinvestimento"] = df_view.apply(
 )
 
 # Tabs para diferentes visualizações
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Tabela Interativa", "🔄 Comparação de Fundos", "💡 Sugestão de Reinvestimento", "📈 Análise Comparativa"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📊 Tabela Interativa", 
+    "🔄 Comparação de Fundos", 
+    "💡 Sugestão de Reinvestimento", 
+    "📈 Análise Comparativa",
+    "💰 Calcular e Aplicar Reinvestimento"
+])
 
 with tab1:
     st.markdown("#### Tabela Completa da Carteira")
@@ -941,6 +952,137 @@ with tab4:
     df_ranking = df_ranking[["Rank", "Ticker", "Yield (%)", "Dividendo_Mensal", "Renda_Mensal"]]
     
     st.dataframe(df_ranking, use_container_width=True, hide_index=True)
+
+with tab5:
+    st.markdown("#### 💰 Calcular e Aplicar Reinvestimento Mensal")
+    
+    renda_total_mensal = df_view["Renda_Mensal"].sum()
+    
+    st.markdown(f"""
+    **💰 Renda Mensal Total Disponível:** R$ {renda_total_mensal:,.2f}
+    
+    Esta ferramenta calcula quantas cotas podem ser compradas com os dividendos recebidos 
+    e gera a carteira atualizada com as novas quantidades.
+    """)
+    
+    # Seleção de estratégia
+    estrategia = st.radio(
+        "📋 Estratégia de Distribuição:",
+        ["proporcional", "yield_alto", "diversificacao"],
+        format_func=lambda x: {
+            "proporcional": "🔄 Proporcional à Renda Gerada",
+            "yield_alto": "📈 Priorizar Maior Yield",
+            "diversificacao": "🎯 Priorizar Diversificação"
+        }[x],
+        help="Escolha como distribuir os dividendos entre os fundos"
+    )
+    
+    # Calcular distribuição
+    distribuicao = calcular_distribuicao_reinvestimento(df, estrategia)
+    
+    # Calcular reinvestimento
+    with st.spinner("Calculando reinvestimento..."):
+        df_reinvestimento = calcular_reinvestimento(df, distribuicao, usar_precos_atuais=True)
+    
+    # Mostrar resultados
+    st.markdown("#### 📊 Resultado do Reinvestimento")
+    
+    # Resumo
+    total_cotas = df_reinvestimento["Cotas_Compradas"].sum()
+    total_investido = df_reinvestimento["Valor_Utilizado"].sum()
+    total_nao_utilizado = df_reinvestimento["Valor_Nao_Utilizado"].sum()
+    
+    col_res1, col_res2, col_res3 = st.columns(3)
+    with col_res1:
+        st.metric("Cotas Compradas", f"{int(total_cotas)}")
+    with col_res2:
+        st.metric("Valor Investido", f"R$ {total_investido:,.2f}")
+    with col_res3:
+        st.metric("Sobra (não utilizada)", f"R$ {total_nao_utilizado:,.2f}")
+    
+    # Tabela detalhada
+    df_reinvest_display = df_reinvestimento.copy()
+    df_reinvest_display = df_reinvest_display[df_reinvest_display["Cotas_Compradas"] > 0]
+    
+    if len(df_reinvest_display) > 0:
+        # Formatação
+        df_reinvest_display["Quantidade_Atual"] = df_reinvest_display["Quantidade_Atual"].apply(lambda x: f"{x:.0f}")
+        df_reinvest_display["Valor_Reinvestir"] = df_reinvest_display["Valor_Reinvestir"].apply(lambda x: f"R$ {x:,.2f}")
+        df_reinvest_display["Preco_Atual"] = df_reinvest_display["Preco_Atual"].apply(lambda x: f"R$ {x:,.2f}")
+        df_reinvest_display["Cotas_Compradas"] = df_reinvest_display["Cotas_Compradas"].apply(lambda x: f"{int(x)}")
+        df_reinvest_display["Valor_Utilizado"] = df_reinvest_display["Valor_Utilizado"].apply(lambda x: f"R$ {x:,.2f}")
+        df_reinvest_display["Nova_Quantidade"] = df_reinvest_display["Nova_Quantidade"].apply(lambda x: f"{x:.0f}")
+        df_reinvest_display["Preco_Medio_Anterior"] = df_reinvest_display["Preco_Medio_Anterior"].apply(lambda x: f"R$ {x:,.2f}")
+        df_reinvest_display["Novo_Preco_Medio"] = df_reinvest_display["Novo_Preco_Medio"].apply(lambda x: f"R$ {x:,.2f}")
+        
+        df_reinvest_display.columns = [
+            "Ticker", "Qtd Atual", "Valor Reinvestir", "Preço Atual",
+            "Cotas Compradas", "Valor Utilizado", "Nova Qtd",
+            "Preço Médio Ant.", "Novo Preço Médio", "Renda Mensal"
+        ]
+        
+        st.dataframe(df_reinvest_display, use_container_width=True, hide_index=True)
+    else:
+        st.info("ℹ️ Nenhuma cota será comprada com a estratégia selecionada. Ajuste os valores ou tente outra estratégia.")
+    
+    # Mostrar relatório
+    with st.expander("📄 Ver Relatório Completo"):
+        relatorio = gerar_relatorio_reinvestimento(df_reinvestimento)
+        st.text(relatorio)
+    
+    # Botão para gerar e salvar carteira atualizada
+    st.markdown("---")
+    st.markdown("#### 💾 Atualizar Carteira")
+    
+    col_btn1, col_btn2 = st.columns(2)
+    
+    with col_btn1:
+        if st.button("📥 Gerar CSV Atualizado", type="primary"):
+            try:
+                df_atualizada = gerar_carteira_atualizada(df, df_reinvestimento)
+                
+                # Criar CSV para download
+                csv_updated = df_atualizada[["Ticker", "Quantidade"]].to_csv(index=False)
+                
+                st.download_button(
+                    label="⬇️ Baixar CSV Atualizado",
+                    data=csv_updated,
+                    file_name=f"carteira_atualizada_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv",
+                    type="primary"
+                )
+                
+                st.success("✅ CSV gerado com sucesso! Baixe o arquivo e substitua o data/carteira.csv")
+            except Exception as e:
+                st.error(f"❌ Erro ao gerar CSV: {e}")
+    
+    with col_btn2:
+        if st.button("💾 Salvar Diretamente (Backup Automático)", help="Atualiza data/carteira.csv e cria backup"):
+            try:
+                df_atualizada = gerar_carteira_atualizada(df, df_reinvestimento)
+                caminho_salvo = salvar_carteira_atualizada(
+                    df_atualizada, 
+                    caminho_original=carteira_path,
+                    criar_backup=True
+                )
+                st.success(f"✅ Carteira atualizada e salva em {caminho_salvo}")
+                st.info("💡 Recarregue a página para ver a carteira atualizada")
+            except Exception as e:
+                st.error(f"❌ Erro ao salvar: {e}")
+    
+    # Instruções
+    st.markdown("---")
+    st.markdown("""
+    ### 📝 Como Funciona:
+    
+    1. **Calcular**: O sistema calcula quantas cotas podem ser compradas com os dividendos
+    2. **Revisar**: Verifique a tabela acima com os resultados
+    3. **Atualizar**: 
+       - **Opção 1**: Baixe o CSV atualizado e substitua manualmente o arquivo `data/carteira.csv`
+       - **Opção 2**: Clique em "Salvar Diretamente" para atualizar automaticamente (backup é criado)
+    
+    ⚠️ **Importante**: Após cada reinvestimento mensal, atualize a carteira usando esta ferramenta.
+    """)
 
 # -------------------------------------------------
 # FOOTER
