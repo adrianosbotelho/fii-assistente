@@ -4,149 +4,109 @@ import plotly.express as px
 from datetime import datetime
 
 # -------------------------------------------------
-# CONFIGURAÇÃO DA PÁGINA
+# CONFIGURAÇÃO
 # -------------------------------------------------
 st.set_page_config(
     page_title="FII Assistente",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
+st.title("📊 FII Assistente – Visão Geral da Carteira")
+
 # -------------------------------------------------
-# SIDEBAR - IMPORTAÇÃO CSV
+# SIDEBAR
 # -------------------------------------------------
-st.sidebar.title("📂 Importar Carteira")
+st.sidebar.header("📂 Importar Carteira")
 uploaded_file = st.sidebar.file_uploader(
     "Importe o CSV da sua carteira",
     type=["csv"]
 )
 
-# -------------------------------------------------
-# TÍTULO PRINCIPAL
-# -------------------------------------------------
-st.title("📊 FII Assistente – Visão Geral da Carteira")
+horizonte = st.sidebar.slider(
+    "Horizonte de Projeção (meses)",
+    min_value=12,
+    max_value=60,
+    value=24
+)
 
 # -------------------------------------------------
-# CARREGAMENTO DO CSV
+# LOAD CSV
 # -------------------------------------------------
 if uploaded_file is None:
-    st.info("⬅️ Importe um arquivo CSV para visualizar sua carteira.")
+    st.info("⬅️ Importe um arquivo CSV para começar.")
     st.stop()
 
 df = pd.read_csv(uploaded_file)
 
 # -------------------------------------------------
-# VALIDAÇÃO DE COLUNAS
+# VALIDAÇÃO
 # -------------------------------------------------
-colunas_esperadas = [
-    "Ticker",
-    "Quantidade",
-    "Preco_Medio",
-    "Dividendo_Mensal"
-]
-
-for col in colunas_esperadas:
-    if col not in df.columns:
-        st.error(f"Coluna obrigatória ausente no CSV: {col}")
+cols = ["Ticker", "Quantidade", "Preco_Medio", "Dividendo_Mensal"]
+for c in cols:
+    if c not in df.columns:
+        st.error(f"Coluna obrigatória ausente: {c}")
         st.stop()
 
-# -------------------------------------------------
-# NORMALIZAÇÃO E CÁLCULOS
-# -------------------------------------------------
-df["Quantidade"] = df["Quantidade"].astype(float)
-df["Preco_Medio"] = df["Preco_Medio"].astype(float)
-df["Dividendo_Mensal"] = df["Dividendo_Mensal"].astype(float)
+df[cols[1:]] = df[cols[1:]].astype(float)
 
+# -------------------------------------------------
+# CÁLCULOS BASE
+# -------------------------------------------------
 df["Valor_Investido"] = df["Quantidade"] * df["Preco_Medio"]
 df["Renda_Mensal"] = df["Quantidade"] * df["Dividendo_Mensal"]
 df["Yield_Mensal"] = df["Renda_Mensal"] / df["Valor_Investido"]
 
-patrimonio_total = df["Valor_Investido"].sum()
-renda_mensal_total = df["Renda_Mensal"].sum()
-yield_mensal_total = renda_mensal_total / patrimonio_total
-renda_anual_projetada = renda_mensal_total * 12
+patrimonio = df["Valor_Investido"].sum()
+renda_mensal = df["Renda_Mensal"].sum()
+yield_medio = renda_mensal / patrimonio
 
 # -------------------------------------------------
-# CARDS EXECUTIVOS
+# CARDS
 # -------------------------------------------------
-col1, col2, col3, col4 = st.columns(4)
+c1, c2, c3, c4 = st.columns(4)
 
-col1.metric("💰 Patrimônio Total", f"R$ {patrimonio_total:,.2f}")
-col2.metric("📥 Renda Mensal", f"R$ {renda_mensal_total:,.2f}")
-col3.metric("📈 Yield Mensal", f"{yield_mensal_total*100:.2f}%")
-col4.metric("📆 Renda Anual Projetada", f"R$ {renda_anual_projetada:,.2f}")
+c1.metric("💰 Patrimônio", f"R$ {patrimonio:,.2f}")
+c2.metric("📥 Renda Mensal", f"R$ {renda_mensal:,.2f}")
+c3.metric("📈 Yield Médio", f"{yield_medio*100:.2f}%")
+c4.metric("📆 Renda Anual", f"R$ {renda_mensal*12:,.2f}")
 
 st.divider()
 
 # -------------------------------------------------
-# GRÁFICO - ALOCAÇÃO DA CARTEIRA
+# PROJEÇÃO COM REINVESTIMENTO
 # -------------------------------------------------
-fig_alocacao = px.pie(
-    df,
-    names="Ticker",
-    values="Valor_Investido",
-    hole=0.45,
-    title="Alocação da Carteira (%)"
-)
+meses = []
+rendas = []
+patrimonios = []
 
-st.plotly_chart(fig_alocacao, use_container_width=True)
+pat = patrimonio
+renda = renda_mensal
 
-# -------------------------------------------------
-# GRÁFICOS EM GRID
-# -------------------------------------------------
-col_g1, col_g2 = st.columns(2)
+for i in range(horizonte):
+    meses.append(i + 1)
+    rendas.append(renda)
+    patrimonios.append(pat)
 
-# Renda mensal por FII
-fig_renda = px.bar(
-    df,
-    x="Ticker",
-    y="Renda_Mensal",
-    title="Renda Mensal por FII",
-    text_auto=".2f"
-)
-
-fig_renda.update_layout(
-    yaxis_title="R$ / mês",
-    xaxis_title="FII"
-)
-
-col_g1.plotly_chart(fig_renda, use_container_width=True)
-
-# Yield por FII
-fig_yield = px.bar(
-    df,
-    x="Ticker",
-    y="Yield_Mensal",
-    title="Yield Mensal por FII",
-    text_auto=".2%"
-)
-
-fig_yield.update_layout(
-    yaxis_title="Yield (%)",
-    xaxis_title="FII"
-)
-
-col_g2.plotly_chart(fig_yield, use_container_width=True)
-
-# -------------------------------------------------
-# PROJEÇÃO DE RENDA (12 MESES)
-# -------------------------------------------------
-meses = pd.date_range(
-    start=datetime.today(),
-    periods=12,
-    freq="ME"
-)
+    pat = pat + renda
+    renda = pat * yield_medio
 
 df_proj = pd.DataFrame({
-    "Mes": meses,
-    "Renda_Projetada": [renda_mensal_total] * 12
+    "Mês": meses,
+    "Renda Mensal Projetada": rendas,
+    "Patrimônio Projetado": patrimonios
 })
 
 fig_proj = px.line(
     df_proj,
-    x="Mes",
-    y="Renda_Projetada",
-    title="Projeção de Renda Mensal – 12 Meses"
+    x="Mês",
+    y="Renda Mensal Projetada",
+    title="📈 Projeção de Renda Mensal com Reinvestimento",
+    markers=True
+)
+
+fig_proj.update_layout(
+    yaxis_title="R$",
+    xaxis_title="Meses"
 )
 
 st.plotly_chart(fig_proj, use_container_width=True)
@@ -154,22 +114,37 @@ st.plotly_chart(fig_proj, use_container_width=True)
 st.divider()
 
 # -------------------------------------------------
-# TABELA DETALHADA
+# ALOCAÇÃO
+# -------------------------------------------------
+fig_pie = px.pie(
+    df,
+    names="Ticker",
+    values="Valor_Investido",
+    hole=0.45,
+    title="Alocação da Carteira"
+)
+
+st.plotly_chart(fig_pie, use_container_width=True)
+
+st.divider()
+
+# -------------------------------------------------
+# TABELA
 # -------------------------------------------------
 st.subheader("📋 Detalhamento da Carteira")
 
-df_exibicao = df.copy()
-df_exibicao["Yield_Mensal (%)"] = df_exibicao["Yield_Mensal"] * 100
+df_view = df.copy()
+df_view["Yield (%)"] = df_view["Yield_Mensal"] * 100
 
 st.dataframe(
-    df_exibicao[[
+    df_view[[
         "Ticker",
         "Quantidade",
         "Preco_Medio",
         "Dividendo_Mensal",
         "Valor_Investido",
         "Renda_Mensal",
-        "Yield_Mensal (%)"
+        "Yield (%)"
     ]],
     use_container_width=True
 )
