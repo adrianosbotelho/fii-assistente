@@ -1005,20 +1005,29 @@ with tab5:
     df_reinvest_display = df_reinvest_display[df_reinvest_display["Cotas_Compradas"] > 0]
     
     if len(df_reinvest_display) > 0:
+        # Selecionar apenas as colunas que queremos exibir
+        colunas_exibir = [
+            "Ticker", "Quantidade_Atual", "Valor_Reinvestir", "Preco_Atual",
+            "Cotas_Compradas", "Valor_Utilizado", "Valor_Nao_Utilizado",
+            "Nova_Quantidade", "Preco_Medio_Anterior", "Novo_Preco_Medio"
+        ]
+        df_reinvest_display = df_reinvest_display[colunas_exibir].copy()
+        
         # Formatação
         df_reinvest_display["Quantidade_Atual"] = df_reinvest_display["Quantidade_Atual"].apply(lambda x: f"{x:.0f}")
         df_reinvest_display["Valor_Reinvestir"] = df_reinvest_display["Valor_Reinvestir"].apply(lambda x: f"R$ {x:,.2f}")
         df_reinvest_display["Preco_Atual"] = df_reinvest_display["Preco_Atual"].apply(lambda x: f"R$ {x:,.2f}")
         df_reinvest_display["Cotas_Compradas"] = df_reinvest_display["Cotas_Compradas"].apply(lambda x: f"{int(x)}")
         df_reinvest_display["Valor_Utilizado"] = df_reinvest_display["Valor_Utilizado"].apply(lambda x: f"R$ {x:,.2f}")
+        df_reinvest_display["Valor_Nao_Utilizado"] = df_reinvest_display["Valor_Nao_Utilizado"].apply(lambda x: f"R$ {x:,.2f}")
         df_reinvest_display["Nova_Quantidade"] = df_reinvest_display["Nova_Quantidade"].apply(lambda x: f"{x:.0f}")
         df_reinvest_display["Preco_Medio_Anterior"] = df_reinvest_display["Preco_Medio_Anterior"].apply(lambda x: f"R$ {x:,.2f}")
         df_reinvest_display["Novo_Preco_Medio"] = df_reinvest_display["Novo_Preco_Medio"].apply(lambda x: f"R$ {x:,.2f}")
         
         df_reinvest_display.columns = [
             "Ticker", "Qtd Atual", "Valor Reinvestir", "Preço Atual",
-            "Cotas Compradas", "Valor Utilizado", "Nova Qtd",
-            "Preço Médio Ant.", "Novo Preço Médio", "Renda Mensal"
+            "Cotas Compradas", "Valor Utilizado", "Sobra",
+            "Nova Qtd", "Preço Médio Ant.", "Novo Preço Médio"
         ]
         
         st.dataframe(df_reinvest_display, use_container_width=True, hide_index=True)
