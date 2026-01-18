@@ -1005,30 +1005,53 @@ with tab5:
     df_reinvest_display = df_reinvest_display[df_reinvest_display["Cotas_Compradas"] > 0]
     
     if len(df_reinvest_display) > 0:
-        # Selecionar apenas as colunas que queremos exibir
+        # Selecionar apenas as colunas que queremos exibir (em ordem específica)
         colunas_exibir = [
             "Ticker", "Quantidade_Atual", "Valor_Reinvestir", "Preco_Atual",
             "Cotas_Compradas", "Valor_Utilizado", "Valor_Nao_Utilizado",
             "Nova_Quantidade", "Preco_Medio_Anterior", "Novo_Preco_Medio"
         ]
-        df_reinvest_display = df_reinvest_display[colunas_exibir].copy()
+        
+        # Filtrar apenas colunas que existem no DataFrame
+        colunas_disponiveis = [col for col in colunas_exibir if col in df_reinvest_display.columns]
+        df_reinvest_display = df_reinvest_display[colunas_disponiveis].copy()
         
         # Formatação
-        df_reinvest_display["Quantidade_Atual"] = df_reinvest_display["Quantidade_Atual"].apply(lambda x: f"{x:.0f}")
-        df_reinvest_display["Valor_Reinvestir"] = df_reinvest_display["Valor_Reinvestir"].apply(lambda x: f"R$ {x:,.2f}")
-        df_reinvest_display["Preco_Atual"] = df_reinvest_display["Preco_Atual"].apply(lambda x: f"R$ {x:,.2f}")
-        df_reinvest_display["Cotas_Compradas"] = df_reinvest_display["Cotas_Compradas"].apply(lambda x: f"{int(x)}")
-        df_reinvest_display["Valor_Utilizado"] = df_reinvest_display["Valor_Utilizado"].apply(lambda x: f"R$ {x:,.2f}")
-        df_reinvest_display["Valor_Nao_Utilizado"] = df_reinvest_display["Valor_Nao_Utilizado"].apply(lambda x: f"R$ {x:,.2f}")
-        df_reinvest_display["Nova_Quantidade"] = df_reinvest_display["Nova_Quantidade"].apply(lambda x: f"{x:.0f}")
-        df_reinvest_display["Preco_Medio_Anterior"] = df_reinvest_display["Preco_Medio_Anterior"].apply(lambda x: f"R$ {x:,.2f}")
-        df_reinvest_display["Novo_Preco_Medio"] = df_reinvest_display["Novo_Preco_Medio"].apply(lambda x: f"R$ {x:,.2f}")
+        if "Quantidade_Atual" in df_reinvest_display.columns:
+            df_reinvest_display["Quantidade_Atual"] = df_reinvest_display["Quantidade_Atual"].apply(lambda x: f"{x:.0f}")
+        if "Valor_Reinvestir" in df_reinvest_display.columns:
+            df_reinvest_display["Valor_Reinvestir"] = df_reinvest_display["Valor_Reinvestir"].apply(lambda x: f"R$ {x:,.2f}")
+        if "Preco_Atual" in df_reinvest_display.columns:
+            df_reinvest_display["Preco_Atual"] = df_reinvest_display["Preco_Atual"].apply(lambda x: f"R$ {x:,.2f}")
+        if "Cotas_Compradas" in df_reinvest_display.columns:
+            df_reinvest_display["Cotas_Compradas"] = df_reinvest_display["Cotas_Compradas"].apply(lambda x: f"{int(x)}")
+        if "Valor_Utilizado" in df_reinvest_display.columns:
+            df_reinvest_display["Valor_Utilizado"] = df_reinvest_display["Valor_Utilizado"].apply(lambda x: f"R$ {x:,.2f}")
+        if "Valor_Nao_Utilizado" in df_reinvest_display.columns:
+            df_reinvest_display["Valor_Nao_Utilizado"] = df_reinvest_display["Valor_Nao_Utilizado"].apply(lambda x: f"R$ {x:,.2f}")
+        if "Nova_Quantidade" in df_reinvest_display.columns:
+            df_reinvest_display["Nova_Quantidade"] = df_reinvest_display["Nova_Quantidade"].apply(lambda x: f"{x:.0f}")
+        if "Preco_Medio_Anterior" in df_reinvest_display.columns:
+            df_reinvest_display["Preco_Medio_Anterior"] = df_reinvest_display["Preco_Medio_Anterior"].apply(lambda x: f"R$ {x:,.2f}")
+        if "Novo_Preco_Medio" in df_reinvest_display.columns:
+            df_reinvest_display["Novo_Preco_Medio"] = df_reinvest_display["Novo_Preco_Medio"].apply(lambda x: f"R$ {x:,.2f}")
         
-        df_reinvest_display.columns = [
-            "Ticker", "Qtd Atual", "Valor Reinvestir", "Preço Atual",
-            "Cotas Compradas", "Valor Utilizado", "Sobra",
-            "Nova Qtd", "Preço Médio Ant.", "Novo Preço Médio"
-        ]
+        # Renomear colunas - mapear exatamente o número de colunas que temos
+        nomes_colunas_map = {
+            "Ticker": "Ticker",
+            "Quantidade_Atual": "Qtd Atual",
+            "Valor_Reinvestir": "Valor Reinvestir",
+            "Preco_Atual": "Preço Atual",
+            "Cotas_Compradas": "Cotas Compradas",
+            "Valor_Utilizado": "Valor Utilizado",
+            "Valor_Nao_Utilizado": "Sobra",
+            "Nova_Quantidade": "Nova Qtd",
+            "Preco_Medio_Anterior": "Preço Médio Ant.",
+            "Novo_Preco_Medio": "Novo Preço Médio"
+        }
+        
+        # Renomear usando dicionário (mais seguro)
+        df_reinvest_display = df_reinvest_display.rename(columns=nomes_colunas_map)
         
         st.dataframe(df_reinvest_display, use_container_width=True, hide_index=True)
     else:
