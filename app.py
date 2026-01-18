@@ -32,55 +32,209 @@ st.set_page_config(
     page_icon="📊"
 )
 
-# Custom CSS para melhorar aparência
-st.markdown("""
-    <style>
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #1f77b4;
-        margin-bottom: 1rem;
-    }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid #1f77b4;
-    }
-    .insight-box {
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 0.5rem 0;
-    }
-    .insight-success {
-        background-color: #d4edda;
-        border-left: 4px solid #28a745;
-    }
-    .insight-warning {
-        background-color: #fff3cd;
-        border-left: 4px solid #ffc107;
-    }
-    .insight-error {
-        background-color: #f8d7da;
-        border-left: 4px solid #dc3545;
-    }
-    .insight-info {
-        background-color: #d1ecf1;
-        border-left: 4px solid #17a2b8;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# Inicializar dark mode no session state
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = True  # Default: dark mode
 
-# -------------------------------------------------
-# HEADER
-# -------------------------------------------------
-st.markdown('<p class="main-header">📊 Dashboard Profissional - FII Assistente</p>', unsafe_allow_html=True)
-st.markdown("**Análise completa da carteira com KPIs, insights de IA e monitoramento de mercado**")
+# Função para obter template de gráfico baseado no tema
+def get_plot_template():
+    """Retorna template do Plotly baseado no tema ativo"""
+    if st.session_state.dark_mode:
+        return "plotly_dark"
+    else:
+        return "plotly_white"
+
+# Função para obter cores do tema
+def get_theme_colors():
+    """Retorna cores do tema atual"""
+    if st.session_state.dark_mode:
+        return {
+            "primary": "#00d4aa",
+            "secondary": "#ff6b9d",
+            "success": "#00e676",
+            "warning": "#ffb74d",
+            "error": "#ef5350",
+            "info": "#29b6f6",
+            "background": "#0e1117",
+            "card": "#1e1e2e",
+            "text": "#fafafa",
+            "text_secondary": "#b0b0b0"
+        }
+    else:
+        return {
+            "primary": "#1f77b4",
+            "secondary": "#ff7f0e",
+            "success": "#2ca02c",
+            "warning": "#ff9800",
+            "error": "#d32f2f",
+            "info": "#0288d1",
+            "background": "#ffffff",
+            "card": "#f5f5f5",
+            "text": "#1e1e1e",
+            "text_secondary": "#666666"
+        }
 
 # -------------------------------------------------
 # SIDEBAR
 # -------------------------------------------------
 st.sidebar.header("⚙️ Configurações")
+
+# Toggle Dark Mode (deve estar no topo para atualizar CSS)
+dark_mode = st.sidebar.toggle(
+    "🌙 Dark Mode",
+    value=st.session_state.dark_mode,
+    help="Alternar entre tema escuro e claro (estilo Grafana)"
+)
+st.session_state.dark_mode = dark_mode
+
+st.sidebar.markdown("---")
+
+# Atualizar cores baseado no estado atual do dark mode (após toggle)
+colors = get_theme_colors()
+
+# Custom CSS estilo Grafana (dinâmico baseado no tema)
+css = f"""
+    <style>
+    /* Reset e base */
+    .main {{
+        background-color: {colors['background']};
+    }}
+    
+    /* Header principal */
+    .main-header {{
+        font-size: 2.5rem;
+        font-weight: 600;
+        color: {colors['primary']};
+        margin-bottom: 0.5rem;
+        letter-spacing: -0.5px;
+    }}
+    
+    .sub-header {{
+        color: {colors['text_secondary']};
+        font-size: 1rem;
+        margin-bottom: 2rem;
+    }}
+    
+    /* Cards e métricas estilo Grafana */
+    .metric-card {{
+        background: linear-gradient(135deg, {colors['card']} 0%, {colors['card']} 100%);
+        padding: 1.25rem;
+        border-radius: 8px;
+        border-left: 3px solid {colors['primary']};
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
+    }}
+    
+    .metric-card:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }}
+    
+    /* Insight boxes */
+    .insight-box {{
+        padding: 1rem 1.25rem;
+        border-radius: 6px;
+        margin: 0.75rem 0;
+        border-left: 4px solid;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }}
+    
+    .insight-success {{
+        background-color: {colors['success']}15;
+        border-left-color: {colors['success']};
+        color: {colors['text']};
+    }}
+    
+    .insight-warning {{
+        background-color: {colors['warning']}20;
+        border-left-color: {colors['warning']};
+        color: {colors['text']};
+    }}
+    
+    .insight-error {{
+        background-color: {colors['error']}15;
+        border-left-color: {colors['error']};
+        color: {colors['text']};
+    }}
+    
+    .insight-info {{
+        background-color: {colors['info']}15;
+        border-left-color: {colors['info']};
+        color: {colors['text']};
+    }}
+    
+    /* Divider estilo Grafana */
+    hr {{
+        border: none;
+        height: 1px;
+        background: linear-gradient(to right, transparent, {colors['primary']}40, transparent);
+        margin: 2rem 0;
+    }}
+    
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {{
+        background-color: {colors['card']};
+    }}
+    
+    /* Botões estilo Grafana */
+    .stButton > button {{
+        background: linear-gradient(135deg, {colors['primary']} 0%, {colors['secondary']} 100%);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.3s;
+    }}
+    
+    .stButton > button:hover {{
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px {colors['primary']}40;
+    }}
+    
+    /* Dataframe styling */
+    .dataframe {{
+        border-radius: 8px;
+        overflow: hidden;
+    }}
+    
+    /* Tabs estilo Grafana */
+    .stTabs [data-baseweb="tab-list"] {{
+        gap: 0.5rem;
+    }}
+    
+    .stTabs [data-baseweb="tab"] {{
+        background-color: {colors['card']};
+        border-radius: 6px 6px 0 0;
+        padding: 0.75rem 1.5rem;
+    }}
+    
+    /* Scrollbar personalizado */
+    ::-webkit-scrollbar {{
+        width: 8px;
+        height: 8px;
+    }}
+    
+    ::-webkit-scrollbar-track {{
+        background: {colors['card']};
+    }}
+    
+    ::-webkit-scrollbar-thumb {{
+        background: {colors['primary']};
+        border-radius: 4px;
+    }}
+    
+    ::-webkit-scrollbar-thumb:hover {{
+        background: {colors['secondary']};
+    }}
+    </style>
+"""
+st.markdown(css, unsafe_allow_html=True)
+
+# -------------------------------------------------
+# HEADER
+# -------------------------------------------------
+st.markdown('<p class="main-header">📊 Dashboard Profissional - FII Assistente</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Análise completa da carteira com KPIs, insights de IA e monitoramento de mercado</p>', unsafe_allow_html=True)
 
 # Carregar carteira
 carteira_path = "data/carteira.csv"
@@ -434,7 +588,8 @@ fig_proj.update_yaxes(title_text="R$", row=2, col=1)
 fig_proj.update_layout(
     height=700,
     showlegend=True,
-    hovermode="x unified"
+    hovermode="x unified",
+    template=get_plot_template()
 )
 
 st.plotly_chart(fig_proj, use_container_width=True)
@@ -535,7 +690,8 @@ try:
         yaxis_title="Patrimônio (R$)",
         hovermode="x unified",
         height=500,
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        template=get_plot_template()
     )
     
     st.plotly_chart(fig_bench, use_container_width=True)
@@ -612,6 +768,7 @@ with col_alloc1:
         color_discrete_sequence=px.colors.qualitative.Set3
     )
     fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+    fig_pie.update_layout(template=get_plot_template())
     st.plotly_chart(fig_pie, use_container_width=True)
 
 with col_alloc2:
@@ -630,7 +787,11 @@ with col_alloc2:
         color_continuous_scale="Greens",
         labels={"Yield (%)": "Yield Mensal (%)"}
     )
-    fig_bar.update_layout(yaxis={'categoryorder': 'total ascending'}, height=400)
+    fig_bar.update_layout(
+        yaxis={'categoryorder': 'total ascending'}, 
+        height=400,
+        template=get_plot_template()
+    )
     st.plotly_chart(fig_bar, use_container_width=True)
 
 st.divider()
@@ -825,7 +986,8 @@ with tab2:
         fig_comp.update_layout(
             title=f"Comparação: {fundo1} vs {fundo2}",
             barmode="group",
-            height=400
+            height=400,
+            template=get_plot_template()
         )
         
         st.plotly_chart(fig_comp, use_container_width=True)
@@ -890,7 +1052,10 @@ with tab3:
         text="Valor Sugerido (R$)"
     )
     fig_reinvest.update_traces(texttemplate="R$ %{text:,.2f}", textposition="outside")
-    fig_reinvest.update_layout(height=400)
+    fig_reinvest.update_layout(
+        height=400,
+        template=get_plot_template()
+    )
     st.plotly_chart(fig_reinvest, use_container_width=True)
     
     st.info("💡 **Dica:** Priorize fundos com yield acima da média para maximizar retorno, mas mantenha diversificação.")
@@ -913,7 +1078,10 @@ with tab4:
             "Yield (%)": "Yield Mensal (%)"
         }
     )
-    fig_scatter.update_layout(height=500)
+    fig_scatter.update_layout(
+        height=500,
+        template=get_plot_template()
+    )
     st.plotly_chart(fig_scatter, use_container_width=True)
     
     # Gráfico comparativo de renda
@@ -936,7 +1104,8 @@ with tab4:
     fig_renda.update_layout(
         title="Renda Mensal por Fundo (Cor = Yield)",
         xaxis_title="Renda Mensal (R$)",
-        height=400
+        height=400,
+        template=get_plot_template()
     )
     
     st.plotly_chart(fig_renda, use_container_width=True)

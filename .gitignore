@@ -27,7 +27,8 @@ Thumbs.db
 *.log
 
 # Streamlit
-.streamlit/
+.streamlit/*
+!.streamlit/config.toml
 
 # Data (se necessário manter privado)
 # data/*.csv
