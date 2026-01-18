@@ -631,18 +631,52 @@ with col_alloc2:
 st.divider()
 
 # -------------------------------------------------
-# TABELA DETALHADA
+# TABELA DETALHADA E COMPARAÇÃO
 # -------------------------------------------------
-st.markdown("### 📋 Detalhamento Completo da Carteira")
+st.markdown("### 📋 Análise Detalhada e Comparação de Fundos")
 
+# Preparar DataFrame para visualização
 df_view = df.copy()
 df_view["Pct_Patrimonio"] = (df_view["Valor_Investido"] / patrimonio) * 100
 df_view["Yield (%)"] = df_view["Yield_Mensal"] * 100
 df_view["Renda_Anual"] = df_view["Renda_Mensal"] * 12
-df_view = df_view.sort_values("Valor_Investido", ascending=False)
+df_view["Dividendo_Anual"] = df_view["Dividendo_Mensal"] * 12
 
-st.dataframe(
-    df_view[[
+# Adicionar métricas comparativas
+yield_medio_geral = df_view["Yield (%)"].mean()
+df_view["Yield_vs_Media"] = df_view["Yield (%)"] - yield_medio_geral
+df_view["Prioridade_Reinvestimento"] = df_view.apply(
+    lambda row: "Alta" if row["Yield (%)"] > yield_medio_geral * 1.1 
+    else "Média" if row["Yield (%)"] > yield_medio_geral * 0.9 
+    else "Baixa", axis=1
+)
+
+# Tabs para diferentes visualizações
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Tabela Interativa", "🔄 Comparação de Fundos", "💡 Sugestão de Reinvestimento", "📈 Análise Comparativa"])
+
+with tab1:
+    st.markdown("#### Tabela Completa da Carteira")
+    
+    # Filtros e ordenação
+    col_filt1, col_filt2 = st.columns(2)
+    
+    with col_filt1:
+        ordenar_por = st.selectbox(
+            "Ordenar por:",
+            ["Valor_Investido", "Yield (%)", "Renda_Mensal", "Pct_Patrimonio", "Ticker"],
+            index=0
+        )
+    
+    with col_filt2:
+        ordem = st.selectbox("Ordem:", ["Decrescente", "Crescente"], index=0)
+    
+    df_sorted = df_view.sort_values(
+        ordenar_por, 
+        ascending=(ordem == "Crescente")
+    )
+    
+    # Formatação profissional da tabela
+    df_display = df_sorted[[
         "Ticker",
         "Quantidade",
         "Preco_Medio",
@@ -651,27 +685,262 @@ st.dataframe(
         "Pct_Patrimonio",
         "Renda_Mensal",
         "Renda_Anual",
-        "Yield (%)"
-    ]].round(2),
-    use_container_width=True,
-    hide_index=True
-)
+        "Yield (%)",
+        "Prioridade_Reinvestimento"
+    ]].copy()
+    
+    # Formatar valores monetários e percentuais
+    df_display["Preco_Medio"] = df_display["Preco_Medio"].apply(lambda x: f"R$ {x:,.2f}")
+    df_display["Dividendo_Mensal"] = df_display["Dividendo_Mensal"].apply(lambda x: f"R$ {x:,.2f}")
+    df_display["Valor_Investido"] = df_display["Valor_Investido"].apply(lambda x: f"R$ {x:,.2f}")
+    df_display["Renda_Mensal"] = df_display["Renda_Mensal"].apply(lambda x: f"R$ {x:,.2f}")
+    df_display["Renda_Anual"] = df_display["Renda_Anual"].apply(lambda x: f"R$ {x:,.2f}")
+    df_display["Pct_Patrimonio"] = df_display["Pct_Patrimonio"].apply(lambda x: f"{x:.2f}%")
+    df_display["Yield (%)"] = df_display["Yield (%)"].apply(lambda x: f"{x:.2f}%")
+    
+    # Renomear colunas para exibição
+    df_display.columns = [
+        "Ticker", "Qtd", "Preço Médio", "Dividendo Mensal",
+        "Valor Investido", "% Patrimônio", "Renda Mensal",
+        "Renda Anual", "Yield %", "Prioridade Reinvest."
+    ]
+    
+    st.dataframe(
+        df_display,
+        use_container_width=True,
+        hide_index=True,
+        height=400
+    )
+    
+    # Estatísticas resumidas
+    st.markdown("#### 📊 Estatísticas Resumidas")
+    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+    
+    with col_stat1:
+        st.metric("Concentração Máxima", f"{df_view['Pct_Patrimonio'].max():.1f}%")
+    
+    with col_stat2:
+        st.metric("Yield Médio", f"{yield_medio_geral:.2f}%")
+    
+    with col_stat3:
+        st.metric("Yield Mínimo", f"{df_view['Yield (%)'].min():.2f}%")
+    
+    with col_stat4:
+        st.metric("Yield Máximo", f"{df_view['Yield (%)'].max():.2f}%")
 
-# Resumo estatístico
-st.markdown("#### 📊 Estatísticas da Carteira")
-col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+with tab2:
+    st.markdown("#### 🔄 Comparação Lado a Lado entre Fundos")
+    
+    col_comp1, col_comp2 = st.columns(2)
+    
+    with col_comp1:
+        fundo1 = st.selectbox("Selecione o primeiro fundo:", df_view["Ticker"].tolist(), key="fundo1")
+    
+    with col_comp2:
+        fundo2 = st.selectbox("Selecione o segundo fundo:", df_view["Ticker"].tolist(), key="fundo2")
+    
+    if fundo1 != fundo2:
+        df1 = df_view[df_view["Ticker"] == fundo1].iloc[0]
+        df2 = df_view[df_view["Ticker"] == fundo2].iloc[0]
+        
+        # Tabela comparativa
+        comparacao = pd.DataFrame({
+            "Métrica": [
+                "Ticker",
+                "Quantidade",
+                "Preço Médio",
+                "Valor Investido",
+                "% do Patrimônio",
+                "Dividendo Mensal",
+                "Dividendo Anual",
+                "Renda Mensal",
+                "Renda Anual",
+                "Yield Mensal (%)"
+            ],
+            fundo1: [
+                df1["Ticker"],
+                f"{df1['Quantidade']:.0f}",
+                f"R$ {df1['Preco_Medio']:,.2f}",
+                f"R$ {df1['Valor_Investido']:,.2f}",
+                f"{df1['Pct_Patrimonio']:.2f}%",
+                f"R$ {df1['Dividendo_Mensal']:,.2f}",
+                f"R$ {df1['Dividendo_Anual']:,.2f}",
+                f"R$ {df1['Renda_Mensal']:,.2f}",
+                f"R$ {df1['Renda_Anual']:,.2f}",
+                f"{df1['Yield (%)']:.2f}%"
+            ],
+            fundo2: [
+                df2["Ticker"],
+                f"{df2['Quantidade']:.0f}",
+                f"R$ {df2['Preco_Medio']:,.2f}",
+                f"R$ {df2['Valor_Investido']:,.2f}",
+                f"{df2['Pct_Patrimonio']:.2f}%",
+                f"R$ {df2['Dividendo_Mensal']:,.2f}",
+                f"R$ {df2['Dividendo_Anual']:,.2f}",
+                f"R$ {df2['Renda_Mensal']:,.2f}",
+                f"R$ {df2['Renda_Anual']:,.2f}",
+                f"{df2['Yield (%)']:.2f}%"
+            ]
+        })
+        
+        st.dataframe(comparacao, use_container_width=True, hide_index=True)
+        
+        # Gráfico de comparação
+        fig_comp = go.Figure()
+        
+        metricas_numericas = {
+            "Valor Investido": (df1["Valor_Investido"], df2["Valor_Investido"]),
+            "Renda Mensal": (df1["Renda_Mensal"], df2["Renda_Mensal"]),
+            "Dividendo Mensal": (df1["Dividendo_Mensal"], df2["Dividendo_Mensal"]),
+            "Yield (%)": (df1["Yield (%)"], df2["Yield (%)"])
+        }
+        
+        for metrica, (valor1, valor2) in metricas_numericas.items():
+            fig_comp.add_trace(go.Bar(
+                name=fundo1 if metrica != "Yield (%)" else f"{fundo1} ({valor1:.2f}%)",
+                x=[metrica],
+                y=[valor1],
+                text=[f"R$ {valor1:,.2f}" if "R$" not in str(valor1) else f"{valor1:.2f}%"],
+                textposition="auto"
+            ))
+            fig_comp.add_trace(go.Bar(
+                name=fundo2 if metrica != "Yield (%)" else f"{fundo2} ({valor2:.2f}%)",
+                x=[metrica],
+                y=[valor2],
+                text=[f"R$ {valor2:,.2f}" if "R$" not in str(valor2) else f"{valor2:.2f}%"],
+                textposition="auto"
+            ))
+        
+        fig_comp.update_layout(
+            title=f"Comparação: {fundo1} vs {fundo2}",
+            barmode="group",
+            height=400
+        )
+        
+        st.plotly_chart(fig_comp, use_container_width=True)
+    else:
+        st.warning("⚠️ Selecione dois fundos diferentes para comparação.")
 
-with col_stat1:
-    st.metric("Concentração Máxima", f"{df_view['Pct_Patrimonio'].max():.1f}%")
+with tab3:
+    st.markdown("#### 💡 Sugestões de Reinvestimento de Dividendos")
+    
+    # Calcular renda total disponível para reinvestimento
+    renda_total_mensal = df_view["Renda_Mensal"].sum()
+    
+    st.markdown(f"""
+    **💰 Renda Mensal Total Disponível para Reinvestimento:** R$ {renda_total_mensal:,.2f}
+    
+    **💡 Estratégia Recomendada:** Baseada em yield, diversificação e priorização de ativos de alta performance.
+    """)
+    
+    # Ordenar por prioridade de reinvestimento
+    df_reinvest = df_view.copy()
+    df_reinvest = df_reinvest.sort_values("Yield (%)", ascending=False)
+    
+    # Calcular sugestão de alocação
+    sugestoes = []
+    for _, row in df_reinvest.iterrows():
+        # Proporção baseada em yield relativo
+        peso_yield = row["Yield (%)"] / df_reinvest["Yield (%)"].sum()
+        # Proporção inversa à concentração (para diversificar)
+        peso_diversificacao = 1 / (row["Pct_Patrimonio"] + 1)
+        # Peso combinado
+        peso_final = (peso_yield * 0.7) + (peso_diversificacao * 0.3)
+        sugestoes.append({
+            "Ticker": row["Ticker"],
+            "Yield (%)": row["Yield (%)"],
+            "Peso Sugerido": peso_final,
+            "Valor Sugerido (R$)": renda_total_mensal * peso_final,
+            "Prioridade": row["Prioridade_Reinvestimento"]
+        })
+    
+    df_sugestao = pd.DataFrame(sugestoes)
+    df_sugestao["Peso Sugerido (%)"] = (df_sugestao["Peso Sugerido"] / df_sugestao["Peso Sugerido"].sum()) * 100
+    df_sugestao["Valor Sugerido (R$)"] = df_sugestao["Valor Sugerido (R$)"] * (df_sugestao["Peso Sugerido"] / df_sugestao["Peso Sugerido"].sum())
+    df_sugestao = df_sugestao.sort_values("Valor Sugerido (R$)", ascending=False)
+    
+    # Formatação
+    df_sugestao_display = df_sugestao.copy()
+    df_sugestao_display["Yield (%)"] = df_sugestao_display["Yield (%)"].apply(lambda x: f"{x:.2f}%")
+    df_sugestao_display["Peso Sugerido (%)"] = df_sugestao_display["Peso Sugerido (%)"].apply(lambda x: f"{x:.1f}%")
+    df_sugestao_display["Valor Sugerido (R$)"] = df_sugestao_display["Valor Sugerido (R$)"].apply(lambda x: f"R$ {x:,.2f}")
+    df_sugestao_display = df_sugestao_display[["Ticker", "Yield (%)", "Prioridade", "Peso Sugerido (%)", "Valor Sugerido (R$)"]]
+    
+    st.dataframe(df_sugestao_display, use_container_width=True, hide_index=True)
+    
+    # Gráfico de sugestão
+    fig_reinvest = px.bar(
+        df_sugestao,
+        x="Ticker",
+        y="Valor Sugerido (R$)",
+        color="Prioridade",
+        color_discrete_map={"Alta": "#28a745", "Média": "#ffc107", "Baixa": "#dc3545"},
+        title="Distribuição Sugerida de Reinvestimento",
+        text="Valor Sugerido (R$)"
+    )
+    fig_reinvest.update_traces(texttemplate="R$ %{text:,.2f}", textposition="outside")
+    fig_reinvest.update_layout(height=400)
+    st.plotly_chart(fig_reinvest, use_container_width=True)
+    
+    st.info("💡 **Dica:** Priorize fundos com yield acima da média para maximizar retorno, mas mantenha diversificação.")
 
-with col_stat2:
-    st.metric("Yield Mínimo", f"{df_view['Yield (%)'].min():.2f}%")
-
-with col_stat3:
-    st.metric("Yield Máximo", f"{df_view['Yield (%)'].max():.2f}%")
-
-with col_stat4:
-    st.metric("Desvio Padrão Yield", f"{df_view['Yield (%)'].std():.2f}%")
+with tab4:
+    st.markdown("#### 📈 Análise Comparativa de Dividendos e Yield")
+    
+    # Gráfico de dividendos vs yield
+    fig_scatter = px.scatter(
+        df_view,
+        x="Dividendo_Mensal",
+        y="Yield (%)",
+        size="Valor_Investido",
+        color="Prioridade_Reinvestimento",
+        hover_data=["Ticker", "Renda_Mensal", "Pct_Patrimonio"],
+        color_discrete_map={"Alta": "#28a745", "Média": "#ffc107", "Baixa": "#dc3545"},
+        title="Dividendo Mensal vs Yield (%)",
+        labels={
+            "Dividendo_Mensal": "Dividendo Mensal (R$)",
+            "Yield (%)": "Yield Mensal (%)"
+        }
+    )
+    fig_scatter.update_layout(height=500)
+    st.plotly_chart(fig_scatter, use_container_width=True)
+    
+    # Gráfico comparativo de renda
+    fig_renda = go.Figure()
+    
+    df_view_sorted = df_view.sort_values("Renda_Mensal", ascending=True)
+    
+    fig_renda.add_trace(go.Bar(
+        y=df_view_sorted["Ticker"],
+        x=df_view_sorted["Renda_Mensal"],
+        orientation='h',
+        name="Renda Mensal",
+        marker_color=df_view_sorted["Yield (%)"],
+        marker_showscale=True,
+        marker_colorbar=dict(title="Yield %"),
+        text=[f"R$ {x:,.2f}" for x in df_view_sorted["Renda_Mensal"]],
+        textposition="outside"
+    ))
+    
+    fig_renda.update_layout(
+        title="Renda Mensal por Fundo (Cor = Yield)",
+        xaxis_title="Renda Mensal (R$)",
+        height=400
+    )
+    
+    st.plotly_chart(fig_renda, use_container_width=True)
+    
+    # Ranking de melhor yield
+    st.markdown("#### 🏆 Ranking por Yield")
+    df_ranking = df_view[["Ticker", "Yield (%)", "Dividendo_Mensal", "Renda_Mensal"]].copy()
+    df_ranking = df_ranking.sort_values("Yield (%)", ascending=False)
+    df_ranking["Rank"] = range(1, len(df_ranking) + 1)
+    df_ranking["Dividendo_Mensal"] = df_ranking["Dividendo_Mensal"].apply(lambda x: f"R$ {x:,.2f}")
+    df_ranking["Renda_Mensal"] = df_ranking["Renda_Mensal"].apply(lambda x: f"R$ {x:,.2f}")
+    df_ranking["Yield (%)"] = df_ranking["Yield (%)"].apply(lambda x: f"{x:.2f}%")
+    df_ranking = df_ranking[["Rank", "Ticker", "Yield (%)", "Dividendo_Mensal", "Renda_Mensal"]]
+    
+    st.dataframe(df_ranking, use_container_width=True, hide_index=True)
 
 # -------------------------------------------------
 # FOOTER
