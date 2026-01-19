@@ -11,6 +11,10 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 
+# Importar sistema de autenticação simples
+from simple_auth import simple_auth
+from user_manager import get_user_data_manager
+
 from core.market_data import obter_indices, calcular_correlacao_carteira_mercado, obter_taxa_selic
 from core.carteira_health import analisar_saude_carteira, gerar_recomendacoes
 from core.news_analyzer import analisar_sentimento_carteira, buscar_noticias_mercado
@@ -21,6 +25,20 @@ from core.reinvestment_manager import (
     salvar_carteira_atualizada, gerar_relatorio_reinvestimento,
     calcular_distribuicao_reinvestimento
 )
+
+# -------------------------------------------------
+# VERIFICAÇÃO DE AUTENTICAÇÃO
+# -------------------------------------------------
+# Verificar se o usuário está autenticado
+if not simple_auth.is_authenticated():
+    simple_auth.render_login_page()
+    st.stop()
+
+# Obter gerenciador de dados do usuário
+user_manager = get_user_data_manager()
+if not user_manager:
+    st.error("❌ Erro ao carregar dados do usuário")
+    st.stop()
 
 # -------------------------------------------------
 # CONFIGURAÇÃO
@@ -78,6 +96,9 @@ def get_theme_colors():
 # SIDEBAR
 # -------------------------------------------------
 st.sidebar.header("⚙️ Configurações")
+
+# Renderizar informações do usuário logado
+simple_auth.render_user_info()
 
 # Toggle Dark Mode (deve estar no topo para atualizar CSS)
 dark_mode = st.sidebar.toggle(

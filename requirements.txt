@@ -4,3 +4,4 @@ numpy==2.4.1
 plotly==5.22.0
 yfinance==1.0
 peewee==3.19.0
+python-dotenv==1.0.0
