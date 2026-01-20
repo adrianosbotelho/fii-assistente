@@ -30,8 +30,17 @@ from core.reinvestment_manager import (
 # VERIFICAÇÃO DE AUTENTICAÇÃO
 # -------------------------------------------------
 # Verificar se o usuário está autenticado
-if not simple_auth.is_authenticated():
-    simple_auth.render_login_page()
+try:
+    if not simple_auth.is_authenticated():
+        simple_auth.render_login_page()
+        st.stop()
+except ValueError as e:
+    st.error(f"❌ Erro de configuração: {e}")
+    st.info("💡 **Solução**: Crie um arquivo `.env` com `AUTH_PASSWORD=sua_senha` ou defina a variável de ambiente.")
+    st.code("cp .env.example .env")
+    st.stop()
+except Exception as e:
+    st.error(f"❌ Erro inesperado: {e}")
     st.stop()
 
 # Obter gerenciador de dados do usuário

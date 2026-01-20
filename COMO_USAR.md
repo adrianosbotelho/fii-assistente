@@ -8,8 +8,8 @@
 # 1. Copiar configuração
 cp .env.example .env
 
-# 2. Editar senha (opcional - padrão é "fii2024")
-# Abra .env e altere AUTH_PASSWORD=sua_senha
+# 2. Editar senha (OBRIGATÓRIO)
+# Abra .env e altere AUTH_PASSWORD=sua_senha_segura
 
 # 3. Instalar dependências
 pip install -r requirements.txt
@@ -22,7 +22,7 @@ streamlit run app.py
 
 1. **Acesse**: `http://localhost:8501`
 2. **Email**: `adrianosbotelho@gmail.com`
-3. **Senha**: `fii2024` (ou a que você definiu no `.env`)
+3. **Senha**: A que você definiu no `.env`
 4. **Clique**: "🚀 Entrar"
 
 ## 📊 Funcionalidades Após Login

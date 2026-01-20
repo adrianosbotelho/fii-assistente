@@ -12,7 +12,7 @@ Sistema de autenticação simplificado para **adrianosbotelho@gmail.com** apenas
 
 ## 🚀 Configuração Local
 
-### 1. Definir Senha
+### 1. Definir Senha (OBRIGATÓRIO)
 
 Crie um arquivo `.env` (copie de `.env.example`):
 
@@ -23,12 +23,14 @@ cp .env.example .env
 Edite o `.env` e defina sua senha:
 
 ```bash
-# Sua senha de acesso
+# Sua senha de acesso (OBRIGATÓRIA)
 AUTH_PASSWORD=sua_senha_segura_aqui
 
 # Modo debug (opcional)
 DEBUG=false
 ```
+
+⚠️ **Importante**: A senha é obrigatória. A aplicação não iniciará sem ela.
 
 ### 2. Instalar Dependências
 

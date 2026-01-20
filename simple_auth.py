@@ -12,10 +12,20 @@ import os
 class SimpleAuth:
     """Autenticação simples com email e senha específicos"""
     
+    def _hash_password(self, password: str) -> str:
+        """Gera hash da senha"""
+        return hashlib.sha256(f"{password}fii_salt".encode()).hexdigest()
+    
     def __init__(self):
         # Configurações do usuário autorizado
         self.authorized_email = "adrianosbotelho@gmail.com"
-        self.authorized_password_hash = self._hash_password(os.getenv("AUTH_PASSWORD", "fii2024"))
+        
+        # Obter senha da variável de ambiente (obrigatória)
+        auth_password = os.getenv("AUTH_PASSWORD")
+        if not auth_password:
+            raise ValueError("AUTH_PASSWORD não definida. Configure no arquivo .env ou variável de ambiente.")
+        
+        self.authorized_password_hash = self._hash_password(auth_password)
         
         # Inicializar session state
         if "authenticated" not in st.session_state:
@@ -192,7 +202,7 @@ class SimpleAuth:
             st.markdown("**🔧 Debug Info:**")
             st.markdown(f"- Email autorizado: {self.authorized_email}")
             st.markdown(f"- Tentativas: {st.session_state.login_attempts}/5")
-            st.markdown(f"- Senha padrão: {os.getenv('AUTH_PASSWORD', 'fii2024')}")
+            st.markdown(f"- AUTH_PASSWORD definida: {'✅' if os.getenv('AUTH_PASSWORD') else '❌'}")
     
     def render_user_info(self):
         """Renderiza informações do usuário na sidebar"""
