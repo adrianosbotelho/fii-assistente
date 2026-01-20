@@ -25,8 +25,63 @@ class UserDataManager:
         # Se não existe, criar uma carteira exemplo
         if not carteira_path.exists():
             self._create_default_carteira(carteira_path)
+        else:
+            # Verificar se a carteira existente tem todas as colunas necessárias
+            try:
+                df_existing = pd.read_csv(carteira_path)
+                required_columns = ["Ticker", "Quantidade", "Preco_Medio", "Dividendo_Mensal"]
+                
+                # Se faltam colunas, completar com valores padrão
+                if not all(col in df_existing.columns for col in required_columns):
+                    self._complete_carteira_columns(carteira_path, df_existing)
+            except Exception as e:
+                # Se houver erro ao ler, criar nova carteira
+                self._create_default_carteira(carteira_path)
         
         return str(carteira_path)
+    
+    def _complete_carteira_columns(self, path: Path, df_existing: pd.DataFrame):
+        """Completa colunas faltantes na carteira existente"""
+        # Valores padrão para FIIs conhecidos (aproximados para exemplo)
+        default_values = {
+            "BTLG11": {"Preco_Medio": 95.50, "Dividendo_Mensal": 0.85},
+            "VISC11": {"Preco_Medio": 95.80, "Dividendo_Mensal": 0.92},
+            "KNCR11": {"Preco_Medio": 110.20, "Dividendo_Mensal": 1.05},
+            "CPTS11": {"Preco_Medio": 8.50, "Dividendo_Mensal": 0.08},
+            "XPML11": {"Preco_Medio": 98.30, "Dividendo_Mensal": 0.85},
+            "GARE11": {"Preco_Medio": 12.80, "Dividendo_Mensal": 0.12},
+            "MXRF11": {"Preco_Medio": 10.45, "Dividendo_Mensal": 0.09},
+            "VGIA11": {"Preco_Medio": 9.20, "Dividendo_Mensal": 0.08},
+            "XPCA11": {"Preco_Medio": 16.50, "Dividendo_Mensal": 0.15},
+            "CPUR11": {"Preco_Medio": 5.80, "Dividendo_Mensal": 0.05},
+            "HGLG11": {"Preco_Medio": 160.50, "Dividendo_Mensal": 1.20},
+            "BCFF11": {"Preco_Medio": 85.20, "Dividendo_Mensal": 0.78}
+        }
+        
+        # Adicionar colunas faltantes
+        if "Preco_Medio" not in df_existing.columns:
+            df_existing["Preco_Medio"] = df_existing["Ticker"].apply(
+                lambda ticker: default_values.get(ticker, {}).get("Preco_Medio", 100.0)
+            )
+        
+        if "Dividendo_Mensal" not in df_existing.columns:
+            df_existing["Dividendo_Mensal"] = df_existing["Ticker"].apply(
+                lambda ticker: default_values.get(ticker, {}).get("Dividendo_Mensal", 1.0)
+            )
+        
+        # Criar backup da versão anterior
+        backup_path = path.parent / f"carteira_backup_upgrade_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        if path.exists():
+            import shutil
+            shutil.copy2(path, backup_path)
+        
+        # Salvar carteira completa
+        df_existing.to_csv(path, index=False)
+        
+        import streamlit as st
+        st.success(f"✅ Carteira atualizada com preços e dividendos estimados!")
+        st.info(f"💡 **Dica**: Use 'Atualizar dados automaticamente' na sidebar para obter preços reais do mercado.")
+        st.info(f"📁 **Backup criado**: {backup_path.name}")
     
     def _create_default_carteira(self, path: Path):
         """Cria uma carteira exemplo para o usuário"""
